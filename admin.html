@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard - SYshop Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>body { font-family: 'Prompt', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <header class="bg-white shadow-sm border-b sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl flex items-center justify-center">
+          <span class="text-white font-bold">SY</span>
+        </div>
+        <div>
+          <h1 class="font-bold text-gray-800">Admin Dashboard</h1>
+          <p class="text-xs text-gray-500">จัดการสินค้า</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="index.html" target="_blank" class="text-gray-500 hover:text-gray-700 text-sm">
+          <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> ดูหน้าร้าน
+        </a>
+        <button id="logoutBtn" class="text-red-500 hover:text-red-700 text-sm font-medium">
+          <i class="fa-solid fa-right-from-bracket mr-1"></i> ออกจากระบบ
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    
+    <section class="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+      <h2 class="text-lg font-bold text-gray-800 mb-4">
+        <i class="fa-solid fa-plus-circle text-green-500 mr-2"></i> เพิ่มสินค้าใหม่
+      </h2>
+      
+      <form id="addForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อสินค้า *</label>
+          <input type="text" id="pName" required 
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"/>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ราคา (บาท) *</label>
+          <input type="number" id="pPrice" required min="0"
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"/>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            รูปภาพสินค้า (อัปโหลดฟรีผ่าน Cloudinary)
+          </label>
+          <input type="file" id="pImage" accept="image/*" 
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"/>
+          <p class="text-xs text-gray-500 mt-1">ฟรี 25GB/เดือน</p>
+        </div>
+        
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="pStock" checked 
+                   class="w-4 h-4 text-green-600 rounded focus:ring-green-500"/>
+            <span class="text-sm text-gray-700">มีสินค้าพร้อมขาย</span>
+          </label>
+        </div>
+        
+        <div>
+          <button type="submit" id="addBtn" 
+                  class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md disabled:opacity-50">
+            <span id="addBtnText">บันทึกสินค้า</span>
+            <span id="addBtnLoading" class="hidden">
+              <i class="fa-solid fa-circle-notch animate-spin mr-2"></i>กำลังบันทึก...
+            </span>
+          </button>
+          <p id="addMsg" class="text-center text-sm mt-2"></p>
+        </div>
+      </form>
+    </section>
+
+    <section class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold text-gray-800">สินค้าทั้งหมด (<span id="totalCount">0</span>)</h2>
+        <button onclick="loadProducts()" class="text-gray-500 hover:text-gray-700 text-sm">
+          <i class="fa-solid fa-rotate-right mr-1"></i> รีเฟรช
+        </button>
+      </div>
+      
+      <div id="adminList" class="space-y-3"></div>
+      
+      <div id="adminLoading" class="text-center py-8 text-gray-500">
+        <i class="fa-solid fa-circle-notch animate-spin text-2xl"></i>
+        <p class="mt-2">กำลังโหลด...</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { firebaseConfig, cloudinaryConfig } from "./js/config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) window.location.href = 'login.html';
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      signOut(auth).then(() => window.location.href = 'login.html');
+    });
+
+    async function uploadToCloudinary(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+      formData.append('cloud_name', cloudinaryConfig.cloudName);
+
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      if (!data.secure_url) throw new Error('อัปโหลดรูปภาพล้มเหลว');
+      return data.secure_url;
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('pName').value;
+      const price = document.getElementById('pPrice').value;
+      const inStock = document.getElementById('pStock').checked;
+      const file = document.getElementById('pImage').files[0];
+      
+      const addBtn = document.getElementById('addBtn');
+      const addBtnText = document.getElementById('addBtnText');
+      const addBtnLoading = document.getElementById('addBtnLoading');
+      const addMsg = document.getElementById('addMsg');
+      
+      addBtn.disabled = true;
+      addBtnText.classList.add('hidden');
+      addBtnLoading.classList.remove('hidden');
+      addMsg.textContent = '';
+
+      try {
+        let imageUrl = '';
+        if (file) {
+          addMsg.textContent = '📤 กำลังอัปโหลดรูปภาพ...';
+          addMsg.className = 'text-center text-sm mt-2 text-blue-600';
+          imageUrl = await uploadToCloudinary(file);
+        }
+
+        await addDoc(collection(db, "products"), {
+          name,
+          price: Number(price),
+          inStock,
+          imageUrl,
+          createdAt: new Date()
+        });
+
+        addMsg.textContent = '✅ บันทึกสำเร็จ!';
+        addMsg.className = 'text-center text-sm mt-2 text-green-600';
+        
+        document.getElementById('addForm').reset();
+        document.getElementById('pStock').checked = true;
+        
+        setTimeout(() => { addMsg.textContent = ''; }, 3000);
+        loadProducts();
+      } catch (error) {
+        console.error(error);
+        addMsg.textContent = '❌ เกิดข้อผิดพลาด: ' + error.message;
+        addMsg.className = 'text-center text-sm mt-2 text-red-600';
+      } finally {
+        addBtn.disabled = false;
+        addBtnText.classList.remove('hidden');
+        addBtnLoading.classList.add('hidden');
+      }
+    });
+
+    async function loadProducts() {
+      const listEl = document.getElementById('adminList');
+      const loadingEl = document.getElementById('adminLoading');
+      const totalEl = document.getElementById('totalCount');
+      
+      loadingEl.classList.remove('hidden');
+      listEl.innerHTML = '';
+      
+      try {
+        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        
+        loadingEl.classList.add('hidden');
+        totalEl.textContent = snapshot.size;
+        
+        if (snapshot.empty) {
+          listEl.innerHTML = '<p class="text-center text-gray-500 py-4">ยังไม่มีสินค้า</p>';
+          return;
+        }
+
+        snapshot.forEach(docSnap => {
+          const p = docSnap.data();
+          const id = docSnap.id;
+          
+          const row = `
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+              <div class="flex items-center gap-4">
+                <img src="${p.imageUrl || 'https://via.placeholder.com/60'}" 
+                     class="w-14 h-14 object-cover rounded-lg border"
+                     onerror="this.src='https://via.placeholder.com/60?text=No+Image'"/>
+                <div>
+                  <p class="font-semibold text-gray-800">${p.name}</p>
+                  <p class="text-sm text-gray-500">฿${Number(p.price).toLocaleString()}</p>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-2">
+                <button onclick="window.toggleStock('${id}', ${p.inStock})" 
+                        class="px-4 py-2 text-sm font-medium rounded-lg transition-colors ${p.inStock ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}">
+                  ${p.inStock ? '✓ มีของ' : '✗ หมด'}
+                </button>
+                <button onclick="window.deleteProduct('${id}')" 
+                        class="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          `;
+          listEl.innerHTML += row;
+        });
+      } catch (error) {
+        console.error(error);
+        loadingEl.classList.add('hidden');
+        listEl.innerHTML = '<p class="text-center text-red-500 py-4">โหลดข้อมูลล้มเหลว</p>';
+      }
+    }
+
+    window.toggleStock = async (id, currentStatus) => {
+      await updateDoc(doc(db, "products", id), { inStock: !currentStatus });
+      loadProducts();
+    };
+    
+    window.deleteProduct = async (id) => {
+      if (confirm('ต้องการลบสินค้านี้ใช่ไหม?')) {
+        await deleteDoc(doc(db, "products", id));
+        loadProducts();
+      }
+    };
+
+    loadProducts();
+  </script>
+</body>
+</html>
